@@ -1,0 +1,3 @@
+.build/
+.vscode/
+run/sim8086.*
