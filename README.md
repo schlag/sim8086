@@ -4,7 +4,7 @@ This project is a work-in-progress of following along with the [Performance-Awar
 ## Usage
 
 ```
-> sim8086.exe -help                                           
+> ./sim8086 -help                                           
 ----- Here is the list of valid arguments: -----
     -show_address: Show address in disassembly
     -a:            Show address in disassembly
