@@ -17,7 +17,7 @@ This project is a work-in-progress of following along with the [Performance-Awar
 ```
 
 ```
-> .\sim8086.exe ../test/listing_0038_many_register_mov    
+> ./sim8086 ../test/listing_0038_many_register_mov    
 ; ../test/listing_0038_many_register_mov
 
 bits 16
@@ -36,7 +36,7 @@ mov bp, ax
 ```
 
 ```
-> .\sim8086.exe -a -b ../test/listing_0038_many_register_mov
+> ./sim8086 -a -b ../test/listing_0038_many_register_mov
 ; ../test/listing_0038_many_register_mov
 
 0x0000 | 89 d9 -- -- -- -- | mov cx, bx
