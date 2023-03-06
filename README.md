@@ -36,20 +36,20 @@ mov bp, ax
 ```
 
 ```
-> ./sim8086 -a -b ../test/listing_0038_many_register_mov
-; ../test/listing_0038_many_register_mov
+> ./sim8086 -a -b ../test/listing_0040_challenge_movs
+; ../test/listing_0040_challenge_movs
 
-0x0000 | 89 d9 -- -- -- -- | mov cx, bx
-0x0002 | 88 e5 -- -- -- -- | mov ch, ah
-0x0004 | 89 da -- -- -- -- | mov dx, bx
-0x0006 | 89 de -- -- -- -- | mov si, bx
-0x0008 | 89 fb -- -- -- -- | mov bx, di
-0x000a | 88 c8 -- -- -- -- | mov al, cl
-0x000c | 88 ed -- -- -- -- | mov ch, ch
-0x000e | 89 c3 -- -- -- -- | mov bx, ax
-0x0010 | 89 f3 -- -- -- -- | mov bx, si
-0x0012 | 89 fc -- -- -- -- | mov sp, di
-0x0014 | 89 c5 -- -- -- -- | mov bp, ax
+0x0000 | 8b 41 db -- -- -- | mov ax, [bx + di - 37]
+0x0003 | 89 8c d4 fe -- -- | mov [si - 300], cx
+0x0007 | 8b 57 e0 -- -- -- | mov dx, [bx - 32]
+0x000a | c6 03 07 -- -- -- | mov [bp + di], byte 7
+0x000d | c7 85 85 03 5b 01 | mov [di + 901], word 347
+0x0013 | 8b 2e 05 00 -- -- | mov bp, [5]
+0x0017 | 8b 1e 82 0d -- -- | mov bx, [3458]
+0x001b | a1 fb 09 -- -- -- | mov ax, [2555]
+0x001e | a1 10 00 -- -- -- | mov ax, [16]
+0x0021 | a3 fa 09 -- -- -- | mov [2554], ax
+0x0024 | a3 0f 00 -- -- -- | mov [15], ax
 ```
 
 ## Build
