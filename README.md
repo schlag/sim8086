@@ -17,7 +17,7 @@ This project is a work-in-progress of following along with the [Performance-Awar
 ```
 
 ```
-> ./sim8086 ../test/listing_0038_many_register_mov    
+> ./sim8086 ../test/listing_0038_many_register_mov
 ; ../test/listing_0038_many_register_mov
 
 bits 16
