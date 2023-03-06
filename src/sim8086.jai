@@ -7,14 +7,12 @@ disassemble :: (filename: string, show_address := false, show_bytes := false) ->
   bytes: []u8 = xx file_contents;
   for bytes {
     decoded_instruction, decoded_bytes := decode_instruction(*bytes[it_index]);
-    to_lower_in_place(decoded_instruction);
-    defer free(decoded_instruction);
     if show_address print_to_builder(*builder, "0x% ", formatInt(it_index, base=16, minimum_digits=4));
     if show_bytes {
       print_to_builder(*builder, "| ");
       for decoded_byte_index: 0..MAX_INSTRUCTION_BYTES-1 {
         if decoded_byte_index < decoded_bytes.count {
-          print_to_builder(*builder, "%", formatInt(decoded_bytes[decoded_byte_index], base=16));
+          print_to_builder(*builder, "%", formatInt(decoded_bytes[decoded_byte_index], base=16, minimum_digits=2));
         } else {
           print_to_builder(*builder, "--");
         }
@@ -34,79 +32,159 @@ disassemble :: (filename: string, show_address := false, show_bytes := false) ->
 #import "Basic";
 #import "String";
 #import "File";
+#import "Math";
 #import "Reflection";
 
-DEBUG_PRINT :: false;
 MAX_INSTRUCTION_BYTES :: 6;
 
-Register :: enum u8 {
-  AL :: 0b0000;
-  CL :: 0b0001;
-  DL :: 0b0010;
-  BL :: 0b0011;
-  AH :: 0b0100;
-  CH :: 0b0101;
-  DH :: 0b0110;
-  BH :: 0b0111;
+Register_Table :: string.[
+  "al",
+  "cl",
+  "dl",
+  "bl",
+  "ah",
+  "ch",
+  "dh",
+  "bh",
 
-  AX :: 0b1000;
-  CX :: 0b1001;
-  DX :: 0b1010;
-  BX :: 0b1011;
+  "ax",
+  "cx",
+  "dx",
+  "bx",
+  "sp",
+  "bp",
+  "si",
+  "di"
+];
 
-  SP :: 0b1100;
-  BP :: 0b1101;
-  SI :: 0b1110;
-  DI :: 0b1111;
-}
+Memory_Table :: string.[
+  "[bx + si%]",
+  "[bx + di%]",
+  "[bp + si%]",
+  "[bp + di%]",
+  "[si%]",
+  "[di%]",
+  "[bp%]",
+  "[bx%]",
+];
 
 decode_instruction :: (instruction: *u8) -> string, []u8 {
   builder: String_Builder;
+  byte:  u8;
   bytes: []u8;
   bytes.data = instruction;
-  bytes.count = 1;
-  operation_code:      u8;
-  operation_direction: u8;
-  operation_size:      u8;
-  operation_mode:      u8;
-  operation_register1: Register;
-  operation_register2: Register;
-  for bytes {
-    debug_print("; -------\n");
-    debug_print("; byte = %\n", formatInt(it, base=16, minimum_digits=2));
-    if it_index == {
-      case 0;
-        operation_code      =  it >> 2;
-        operation_direction = (it >> 1) & 0b000001;
-        operation_size      =  it       & 0b000001;
-        debug_print("; operation_code      = %\n",   formatInt(operation_code, base=16, minimum_digits=2));
-        debug_print("; operation_direction = %\n",   formatInt(operation_direction, base=16));
-        debug_print("; operation_size      = %\n\n", formatInt(operation_size, base=16));
 
-        if operation_code == {
-          case 0x22;
-            print_to_builder(*builder, "mov");
-            bytes.count += 1;
-          case;
-            print_to_builder(*builder, "unk");
+  operation_code:              u8;
+  operation_direction:         u8;
+  operation_size:              u8;
+  operation_mode:              u8;
+  operation_register_one:      u8;
+  operation_register_one_code: string;
+  operation_register_two:      u8;
+  operation_register_two_code: string;
+  operation_displacement:      s16;
+
+  chomp_byte();
+
+  operation_code      =  byte >> 2;
+  operation_direction = (byte >> 1) & 0b000001;
+  operation_size      =  byte       & 0b000001;
+
+  if operation_code == {
+    case 0x22; #through;
+    case 0x31;
+      chomp_byte();
+      operation_mode = byte >> 6;
+      operation_register_one = ((byte >> 3) & 0b000111) | (operation_size << 3);
+      operation_register_one_code = Register_Table[operation_register_one];
+      operation_register_two = byte & 0b000111;
+      operation_register_two_code = Memory_Table[operation_register_two];
+
+      direct := false;
+      offset := "";
+
+      if operation_mode == {
+        case 0;
+          if operation_register_two == 6 {
+            direct = true;
+            operation_register_two_code = "[%]";
+            operation_displacement = chomp_s16();
+          }
+        case 1;
+          operation_displacement = chomp_s8();
+        case 2;
+          operation_displacement = chomp_s16();
+        case 3;
+          operation_register_two =  (byte & 0b000111) | (operation_size << 3);
+          operation_register_two_code = Register_Table[operation_register_two];
+      }
+
+      if direct {
+        offset = tprint("%", cast(u16) operation_displacement);
+      } else {
+        if operation_displacement < 0 {
+          offset = tprint(" - %", abs(operation_displacement));
+        } else if operation_displacement > 0 {
+          offset = tprint(" + %", operation_displacement);
         }
-      case 1;
-        operation_mode      =      it >> 6;
-        operation_register1 = xx ((it >> 3) & 0b000111) | (operation_size << 3);
-        operation_register2 = xx  (it       & 0b000111) | (operation_size << 3);
-        if operation_direction == 0 {
-          operation_register1, operation_register2 = swap(operation_register1, operation_register2);
+      }
+      operation_register_two_code = tprint(operation_register_two_code, offset);
+
+      if operation_code == 0x31 {
+        operation_direction = 0;
+        if operation_size {
+          operation_register_one_code = tprint("word %", cast,no_check(u16) chomp_s16());
+        } else {
+          operation_register_one_code = tprint("byte %", cast,no_check(u8) chomp_s8());
         }
-        debug_print("; operation_mode      = %\n",   formatInt(operation_mode, base=2, minimum_digits=2));
-        debug_print("; operation_register1 = %\n",   formatInt(cast(u8) operation_register1, base=2, minimum_digits=4));
-        debug_print("; operation_register2 = %\n", formatInt(cast(u8) operation_register2, base=2, minimum_digits=4));
-        print_to_builder(*builder, " %, %", enum_value_to_name(operation_register1),  enum_value_to_name(operation_register2));
-    }
+      }
+
+      if operation_direction {
+        print_to_builder(*builder, "mov %, %", operation_register_one_code,  operation_register_two_code);
+      } else {
+        print_to_builder(*builder, "mov %, %", operation_register_two_code,  operation_register_one_code);
+      }
+    case 0x2c; #through;
+    case 0x2e; #through;
+    case 0x2d; #through;
+    case 0x2f;
+      operation_size = (byte >> 3) & 0b000001;
+      operation_register_one = xx (byte & 0b000111) | (operation_size << 3);
+      print_to_builder(*builder, "mov %, %", Register_Table[operation_register_one],  ifx operation_size then chomp_s16() else chomp_s8());
+    case 0x28;
+      operation_register_one_code = "ax";
+      if operation_size {
+        operation_register_two_code = tprint("[%]", cast,no_check(u16) chomp_s16());
+      } else {
+        operation_register_two_code = tprint("[%]", cast,no_check(u8) chomp_s8());
+      }
+      if operation_direction {
+        print_to_builder(*builder, "mov %, %", operation_register_two_code,  operation_register_one_code);
+      } else {
+        print_to_builder(*builder, "mov %, %", operation_register_one_code,  operation_register_two_code);
+      }
+    case;
+      print_to_builder(*builder, "unk");
   }
-  debug_print("; -------\n\n");
-  return builder_to_string(*builder), bytes;
-}
 
-debug_print :: (format_string: string, args: .. Any, to_standard_error := false) {
-  #if DEBUG_PRINT print(format_string, ..args, to_standard_error);
+
+  chomp_byte :: () #expand {
+    `bytes.count += 1;
+    `byte = bytes[bytes.count-1];
+  }
+
+  chomp_s8 :: () -> s8 #expand {
+    chomp_byte();
+    return cast,no_check(s8) `byte;
+  }
+
+  chomp_s16 :: () -> s16 #expand {
+    chomp_byte();
+    low := `byte;
+    chomp_byte();
+    high := `byte;
+    return ((cast,no_check(s16)(high)) << 8) | low;
+  }
+
+  return builder_to_string(*builder), bytes;
 }
