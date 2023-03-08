@@ -29,8 +29,7 @@ test :: (workspace: Workspace, success: bool) {
     failed_count := 0;
     for test_files {
       passed := validate_output(command, it, path_strip_extension(it));
-      print("  %", it);
-      print("...");
+      print("  %...", it);
       for it.count..longest_filename {
         print(".");
       }
@@ -54,12 +53,10 @@ test :: (workspace: Workspace, success: bool) {
 
 validate_output :: (command: string, source_file: string, test_file: string) -> bool {
   result, output, error := run_command(command, test_file, capture_and_return_output=true);
-  test_lines := split(output, "\n");
-  test_lines = clean_lines(test_lines);
+  test_lines := split_clean_lines(output);
 
   source_content := read_entire_file(source_file);
-  source_lines := split(source_content, "\n");
-  source_lines = clean_lines(source_lines);
+  source_lines := split_clean_lines(source_content);
 
   if source_lines.count != test_lines.count return false;
 
@@ -70,7 +67,8 @@ validate_output :: (command: string, source_file: string, test_file: string) -> 
   return true;
 }
 
-clean_lines :: (lines: []string) -> []string {
+split_clean_lines :: (contents: string) -> []string {
+  lines := split(contents, "\n");
   cleaned_lines: [..]string;
   for lines {
     trimmed := trim(it, " \t\r\n");
